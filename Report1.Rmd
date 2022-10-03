@@ -1,0 +1,372 @@
+---
+title: "FDS Final Project: Report #1"
+output: html_document
+---
+
+```{r Setup, include= FALSE}
+
+knitr::opts_chunk$set(echo=FALSE, message  = FALSE, warning = FALSE)
+
+```
+
+## Exercises
+
+# Part 1
+
+```{r part 1}
+
+library(rvest)
+library(tidyverse)
+library(data.table)
+library(infer)
+
+page_html <- xml2::read_html("https://epfl-exts.github.io/rental-scrape/")
+
+location <- page_html %>% 
+  html_nodes(".address") %>% 
+  html_text() %>% 
+  str_trim() %>% 
+  unlist()
+
+price <- page_html %>% 
+  html_nodes(".price") %>% 
+  html_text() %>% 
+  str_trim() %>% 
+  unlist()
+
+currency <- as.tibble(price) %>% 
+  separate(value, c("price", "currency"), sep=" ")
+
+currency[currency$price=="Price",1] <- ("Price on request")
+
+currency[currency$price=="Price on request",2] <- (NA)
+
+object_type <-  page_html %>% 
+  html_nodes(".object-type") %>% 
+  html_text() %>% 
+  str_trim() %>% 
+  unlist() 
+
+rooms <-  page_html %>% 
+  html_nodes(".rooms") %>% 
+  html_text() %>% 
+  str_trim() %>% 
+  unlist() 
+
+rooms <- as.tibble(rooms) %>%
+  separate(value, c("Rooms", "Other"), sep=" ")
+
+rooms[rooms$Rooms=="NA", 1]<- NA
+
+living_space_m2 <-  page_html %>% 
+  html_nodes(".living-space") %>% 
+  html_text() %>% 
+  str_trim() %>% 
+  unlist() 
+
+living_space_m2 <- as.tibble(living_space_m2) %>%
+  separate(value, c("Living space", "Other"), sep=": ")
+
+living_space_m2[living_space_m2$Other=="NA", 2]<- NA
+
+living_space_m2 <- living_space_m2 %>%
+  separate(Other, c("Other", "Other2"), sep=" ")
+
+floor <-  page_html %>% 
+  html_nodes(".floor") %>% 
+  html_text() %>% 
+  str_trim() %>% 
+  unlist() 
+
+floor <- as.tibble(floor) %>% 
+  separate(value, c("floor", "Other"), sep=": ")
+
+floor[floor$Other=="NA", 2]<- NA
+
+availability <-  page_html %>% 
+  html_nodes(".availability strong") %>% 
+  html_text() %>% 
+  str_trim() %>% 
+  unlist() 
+
+usable_surface <- page_html %>% 
+  html_nodes(".usable-surface") %>% 
+  html_text() %>% 
+  str_trim() %>% 
+  unlist() 
+
+usable_surface <- as.tibble(usable_surface) %>%
+  separate(value, c("Usable surface", "Other"), sep=": ")
+
+usable_surface[usable_surface$Other=="NA", 2]<- NA
+
+page_html_2 <- data.frame(location=location, availability=availability, 
+                          price=as.numeric(currency$price), 
+                          currency=currency$currency, 
+              object_type=object_type, 
+              rooms=as.numeric(rooms$Rooms), 
+              living_space_m2=as.numeric(living_space_m2$Other),
+              floor=as.numeric(floor$Other), 
+              usable_surface=usable_surface$Other)
+
+page_html_2$availability[page_html_2$availability=="NA"]<- NA
+
+page_html_2$living_space_m2[page_html_2$living_space_m2==1]<- NA
+
+head(page_html_2[,c(1:4)], 10)
+
+#NEW 
+
+```
+
+To begin with, I loaded the libraries I will need during the exercice.
+
+Then, I had to import and save the data with the epfl link into page_html.
+
+Then, I was able to use location from this data set, as well as price.
+
+For this variable, I had to separate price and currency with the function separate. I was also needed to use NA values in order to analyse after the data set correclty.
+
+Then, I had to exatract object:type as well as rooms which I had again to reshape the data. I had to separate rooms from the number of the rooms. NA values assigments was the following step.
+
+Same for living space, separator like ":" then assigning NA values.
+
+Same for floor, separated by the number of the floor.
+
+Then, it was quite the same process for usable surface.
+
+When everything was extract, I could create the data frame with everything together into page_html_2.
+
+Actually, as in the rows 528 the living space was showing 1m2, we have removed the data in order to get a clean data set.
+
+# Part 2
+
+
+```{r part 2}
+
+page_html_2 <- page_html_2 %>% 
+  mutate(location_statut=(ifelse(page_html_2$location %like% 
+                                   "request|demande", "Request", "Listed")))
+page_html_2 %>% 
+  filter(price!="Price on request") %>% 
+  ggplot(aes(x=(living_space_m2), y=price, alpha=location_statut)) + 
+  geom_point()+
+  labs(x="Living Space in m2",
+       y="Price", 
+       title="Scatter plot showing the relationship 
+       between price and living space in m2")
+
+```
+
+On the part 2, I had to create the scatter plot, and I had to reshape price on request.
+
+As the instructor told me, I changed the position of x and y for a better view.
+
+To resume, the scatter plot show the relationship between price and living space in m2.
+
+# Part 3
+
+
+```{r part 3}
+
+page_html_2 <- page_html_2 %>% 
+  mutate(postcode=gsub("[^0-9]","",page_html_2$location))
+
+substrRight <- function(x, n){
+  substr(x, nchar(x)-n+1, nchar(x))
+}
+
+page_html_2$postcode <-substrRight(page_html_2$postcode, 4)
+
+ggplot(page_html_2, aes(x=postcode)) +
+  geom_bar()+
+   theme(axis.text.x = element_text(angle = 90))+
+  labs(x="Postcode", y="Frequency", title="Frequency by postcode")+
+  coord_flip()
+
+```
+
+On this part 3 and in order to realise the exercice, I had to keep only the numbers and created a new colowns with that numbers into page_html_2. Then, I had to keep only the last 4 numbers to get the postcode.
+
+Then, I could plot the bar plot below. Indeed, it represent the frequency by postcode.
+
+A small point here : I made a vertical geom_bar first. Looking with instructors, I changed for the postcode with the y absice using coord_flip.
+
+# Part 4
+
+```{r part 4}
+
+page_html_2 %>% filter(price!="Price on request", floor<=6) %>%
+  ggplot(aes(x=(living_space_m2), y=price, color=postcode)) + 
+  geom_point()+
+   facet_wrap(~floor)+
+  labs(x="Price in CHF", 
+       y="Surface in m2", title="Price of flats over living space", 
+       subtitle="Separated by floor usign facets and postcodes using colors")+
+  theme(legend.position="none")+
+  theme(axis.text.x = element_text(angle = 90))
+
+```
+
+Regarding this part 4, the objective was to use the postcode for creating a scatterplot with the living space m2.
+
+Again here, I invert x and y as the instructor propose me, because I made it differently the first time. The visualisation is quite better now.
+
+# Part 5
+
+```{r part 5}
+
+page_html_2$price[page_html_2$price=="Price on request"]<- NA
+
+page_html_2 %>% 
+        filter(price<17000) %>% 
+  ggplot(mapping =aes(x=factor(location_statut), y=(price))) + 
+  geom_boxplot()+
+  labs(x="Location statut", y="Price",
+       title="Boxplot showing the price by location statut")
+ 
+page_html_2 %>% 
+  ggplot(mapping =aes(x=factor(location_statut), y=living_space_m2)) + 
+  geom_boxplot()+
+  labs(x="Location statut", y="Living Space (m2)", 
+       title="Boxplot showing the living space m2 by location statut")
+
+page_html_2 %>% 
+      filter(floor<40) %>% 
+  ggplot(mapping =aes(x=factor(location_statut), y=floor)) + 
+  geom_boxplot()+
+  labs(x="Location statut", y="Floor", 
+  title="Boxplot showing the floor by location statut")
+
+```
+
+First of all, I created a code, 1 for "request" or 0 for "on demand".
+
+On the price, the challenge was to pu the columns as numeric and to delete text "in request" with NA.
+
+Then, I createda boxplot showing the location and price.
+
+Answer : actually we see that location that are mentioned as "on request" seems to have less floor than the other.
+
+After that, I created the boxplot for the location and living_space.
+
+Answer : actually we see that location that are mentioned as "on request" seems to have more living space than the other.
+
+Finally, I created the boxplot for location and floor.
+
+Answer : actually we see that location that are mentioned as "on request" seems to have less floor than the other
+
+UPDATE 19.01.22
+
+Regarding the boxplot price and location statut and living space and location statut, it seems that it exist an observable difference on the price egarding location statut which are "on request", or "listed". However, it does not look significant at all. To do so, another step would be to apply a t test to trust or not the significant parameters.
+
+Regarding the boxplot floor and location statut, it seems that the difference is not that much. Again, t test could be use in another step.
+
+# Part 6
+
+```{r part 6}
+
+page_html_2 <- page_html_2 %>% 
+  mutate(price_per_m2= ((price)/living_space_m2))
+
+tapply(page_html_2$price_per_m2, page_html_2$location_statut, summary)
+
+t.test(page_html_2$price_per_m2[page_html_2$location_statut=="Listed"], page_html_2$price_per_m2[page_html_2$location_statut=="Request"])
+
+library(rstatix)
+
+page_html_2 %>% t_test(price_per_m2~location_statut)
+
+
+```
+
+First, I created the new columns with price and living space.
+
+Then, I created a sommuary for each location group. 0 means other one and 1 means request.
+
+Answer: so we can see that location that are on demand have a m2 a quite close to than the other one
+
+t test apply is used for only those that are equal 1 and 0, and then I compared groups.
+
+Here, the null hypothesis, there is no difference in p-value and should be > or = 0,05
+
+The alternative hypothesis is that there is a difference that should be less than P-value = 0,05
+
+Answer : Actually on our case, by reading the p-value = 0,6268, we can not reject the null hypothesis, in other terms, there is no significant difference between group 1 and 0, regarding a real population generalization from the data we have.
+
+Also, as the instructor told me, I apply another t_test to obtain a different result.
+
+Conclusion: looking at the price per m2, it is actually understandable that prices stay the same from both groups. Actually, this is not because the location is not show that the price per m2 will be different. For me, there is not link between this both variable, which is confirmed by the t test. Also, we found a difference in two groups while looking at the price per type of location (0, or 1) in the first analysis. But, if we do the ratio between price and living space m2, price is growing in the same manners than living space m2, so the ration is closely the same.
+
+UPDATE 19.01.22
+
+I could also used the infer package regarding statistical inference with dplyr.
+
+### Part 7
+
+```{r part 7}
+
+#t.test(page_html_2$price[page_html_2$location_statut==1], page_html_2$price[page_html_2$location_statut==0])
+
+obs_stat<- page_html_2 %>% 
+  specify(price~location_statut) %>% 
+  calculate(stat="diff in means", order=c("Listed","Request"))
+  
+ page_html_2 %>%
+  specify(price ~ location_statut) %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = 1000, type = "permute") %>%
+  calculate(stat = "diff in means", order = c("Listed", "Request")) %>% 
+  get_p_value(obs_stat =obs_stat, direction = "two-sided")
+
+```
+
+For this part, we are doing the same as in part 6 but for price variable.
+
+As the t test is under p-value = 0,05, so price is significantly difference by location group (1 or 0, so on demand or not). BUT, even if both group appear like to be different, it is independent from the price per cm2 that we calcul just before. The price is significantly different from both groups, but the price per m2 is not.
+
+Update
+
+Using infer package, we could provide a different way of analysis fitting with dplyr skills. As the p_value = 0 which is under 0, the result is the same than with the other way.
+
+### Part 8
+
+```{r part 8}
+
+library(ggmap)
+
+register_google(key = "AIzaSyCS4J7H1dcgeX2v94SwuIm4YuLJ3pPuu5g")
+
+geocode("Geneva")
+
+geocode(c("White House", "Uluru"))
+
+library(tidygeocoder)
+library(ggmap)
+
+page_html_adresses <- page_html_2 %>% filter(location_statut==0) %>% 
+  head(30)
+
+addresses <- data.frame(addr=page_html_adresses$location)
+
+coordinates <- addresses %>%
+  geocode(addr)
+
+map <- get_map(c(left = 6.107025, bottom = 46.183518,  right = 6.195431, top = 46.228066))
+
+ggmap(map) +
+      geom_point(
+        aes(x = long, y = lat),
+        data = coordinates, colour = "red", size = 3
+      )
+
+```
+
+
+The first step for this part 8 was to registe and download information with my key code which is : AIzaSyCS4J7H1dcgeX2v94SwuIm4YuLJ3pPuu5g
+
+At this step, I couldn't go ahead because they required a payment method so I decided to work on tidygeocoder.
+
+Using google map, I extracted the long and lat we wanted to use to determined the perimeter of our map.
+
+Finally, I ploted the map.

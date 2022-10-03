@@ -1,0 +1,6 @@
+location,price,currency,object_type,rooms,living_space,floor,availability,usable_surface
+"Florissant, 1206 Genève",8700,CHF,Apartment,5,250 m2,"NA","NA",250 m2
+"Avenue Théodore-Weber 34, 1208 Genève",2190,CHF,Apartment,3.5,57 m2,"NA",Immediately,"NA"
+"Chemin François-Lehmann 26, 1218 Le Grand-Saconnex",2490,CHF,Apartment,3.5,75 m2,6. Floor,2018-08-01,"NA"
+"Address on request, 1201 Genève",5360,CHF,Apartment,7,149 m2,10. Floor,Immediately,"NA"
+"Rue Crespin 18, 1206 Genève",3380,CHF,Apartment,5,115 m2,6. Floor,"NA","NA"
