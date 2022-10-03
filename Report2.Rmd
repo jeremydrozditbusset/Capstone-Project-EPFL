@@ -1,0 +1,380 @@
+---
+title: "Project 2"
+output: html_document
+---
+
+```{r Setup, include= FALSE}
+
+knitr::opts_chunk$set(echo=FALSE, message  = FALSE, warning = FALSE)
+
+```
+
+## Exercises
+
+# Part 1
+
+```{r part 1}
+
+library(DBI)
+library(tidyverse)
+library(tidygeocoder)
+library(ggmap)
+
+politicians <- dbConnect(RSQLite::SQLite(), "zh_politicians.db")
+
+mandates <- tbl(politicians, "MANDATES") %>%
+  collect()
+
+persons <- tbl(politicians, "PERSONS") %>%
+  collect()
+
+affiliations <- tbl(politicians, "AFFILIATIONS") %>%
+  collect()
+
+mandates <- tbl(politicians, "MANDATES") %>%
+  collect()
+
+addresses<- tbl(politicians, "ADDRESSES") %>%
+  collect()
+
+con <- dbConnect(RSQLite::SQLite(), ":memory:")
+dbDisconnect(con)
+
+mandates$MANDATE_END_YEAR[mandates$MANDATE_END_YEAR==0]<- 2019
+
+mandates$MANDATE_END_MONTH[mandates$MANDATE_END_MONTH==0]<- 1
+
+mandates$MANDATE_END_DAY[mandates$MANDATE_END_DAY==0]<- 1
+
+pos1=which(mandates$MANDATE_START_YEAR==0)
+
+mandates=mandates[-pos1,]
+
+mandates$active <- map2(mandates$MANDATE_START_YEAR, 
+                        mandates$MANDATE_END_YEAR, seq)
+
+mandates <- mandates %>% unnest(active)
+
+mandates_freq <- mandates %>% count(active, ASSEMBLY)
+
+ggplot(mandates_freq, mapping=aes(x=active, y = n, color=ASSEMBLY))+
+  geom_line()+
+  labs(x="Years", y="Number of mandates", title ="Number of active mandates each year", 
+       subtitle = "The peaks are caused by election 
+       years when multiple mandates were active for the same seat")
+
+```
+First, I had to connect the data and saving the "mandates" one.
+
+I removed the frst rows, saved freq and ploted the graph.
+
+# Part 2
+
+```{r part 2}
+
+pers=which(persons$GENDER=="")
+
+persons=persons[-pers,]
+
+mandates <- mandates %>% inner_join(persons, by = c("PERSON_ID" = "ID"))
+
+mandates_freq_gender <- mandates %>% count(GENDER, active, ASSEMBLY)
+
+ggplot(mandates_freq_gender, aes(x=active, y = n, color=GENDER))+
+  geom_line()+
+  facet_grid(ASSEMBLY~., scales="free")+
+  labs(x="Years", title ="Number of active mandates each year, by gender")
+
+```
+In the part 2, I loaded persons data and saved it in "persons".
+
+I connected with join, in "mandates".
+
+Then, I created a data frame with the actual baroable into "mandates_freq_gender".
+
+I ploted everything  using ggplot and facet_grid.
+
+Then, I integrated the unnest in the next steps of the exercice.
+
+# Part 3
+
+```{r part 3}
+
+mandates <- mandates %>% inner_join(affiliations, 
+                                    by = c("PERSON_ID" = "PERSON_ID"))
+
+mandates_with_party <- mandates %>% filter(active==2000) %>% 
+  count(active, PARTY, ASSEMBLY)
+
+mandates_with_party%>%
+  ggplot(aes(x="",y=n, fill=PARTY)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0)+
+  facet_wrap(~ASSEMBLY)+
+    labs(x=" ", y=" ", title ="Pie chart by assembly, with corresponding party")
+
+```
+In part 3, first I saved the data affiliations into "affiliations".
+
+Then, I connected with joint in "mandates".
+
+The next step was to create the data frame saved into m"mandates_with_party".
+
+I had to calculate active year liek before, and include them as well as who have finished at this time (actually they are included int he active one).
+
+I created the pie chart from "mandates_with_party".
+
+To conclude, I can see that the most used party is actually the SP.
+
+# Part 4
+
+```{r part 4}
+
+mandates_with_party_2 <- mandates %>% count(active, PARTY, ASSEMBLY)
+
+mandates_with_party_2$PARTY[mandates_with_party_2$PARTY==""]<-NA
+
+ggplot(mandates_with_party_2 %>% filter(active>=1980), 
+       aes(x=active, y = n, color=PARTY))+
+  geom_line()+
+  facet_wrap(~ASSEMBLY, scales="free")+
+  guides(color="none")+
+  labs(x="Active", y="Frequency", 
+       title = "Number of election over the years by council")
+
+```
+In the part 4, I created a data frame without the filter value and save it in madates_with_party_2.
+
+I had to change null value to NA.
+
+I ploted the graph with ggplot, using geom_line and facet_wrap.
+
+# Part 5
+
+```{r part 5}
+
+mandates_1 <- mandates %>% 
+  filter(YEAR_OF_DEATH>0) %>% 
+  mutate(   title_or_not=ifelse(TITLE=="", 0, 1)   )
+
+pos3=which(mandates_1$YEAR_OF_BIRTH==0)
+
+mandates_1=mandates_1[-pos3,]
+
+mandates_1 <- mandates_1 %>% 
+  mutate(age=(  (as.numeric(YEAR_OF_DEATH))-(YEAR_OF_BIRTH)  ))
+
+mandates_1<-mandates_1[mandates_1$age>18,]
+
+mandates_1<-mandates_1[mandates_1$age<120,]
+
+tapply(mandates_1$age, mandates_1$title_or_not, summary)
+
+ggplot(mandates_1, aes(x=factor(title_or_not), y=age, color=factor(title_or_not)))+
+         geom_boxplot()+
+  geom_violin()+
+      labs(x="Variable", y="Age", title ="Boxplot regarding year of birth")
+
+t.test(mandates_1$age[mandates_1$title_or_not==1],
+       mandates_1$age[mandates_1$title_or_not==0])
+
+
+```
+
+In the part 5, for that exercice, I filtered by year of birth more than 0, and attribute 1 or 0 if there is a title or not. I saved in in "mandates_1".
+
+Then, I checked how many people have 0, saving the data into "pos3".
+
+I removed those persons (by removing "-pos3")
+
+I had to convert year of death "as.numeric" because it was character, and also we add age coums to count the difference between both year. I saved in in "mandates_1".
+
+Some resultats was under 18 years so I had to remove all values below 18.
+
+I summarized with the function "taaply". and ploted using ggplot.
+
+Looking at the summary, it looks it is okay, as there is no strange values for example.
+
+Then, I used t test to answer to the question and compare if there is a sgnificant difference.
+
+Conclusion :As p-value is equal to p-value < 2.2e-16 sop there is a significant difference between the title or no title.
+
+## Part 6
+
+```{r part 6}
+
+mandates_1=mandates_1 %>% 
+  mutate(before_1918=YEAR_OF_BIRTH<1918)
+
+ggplot(mandates_1, aes(x=before_1918, y=age))+
+         geom_boxplot()+
+        labs(x="Before 1918", y="Age", title ="Boxplot regarding date of birth 
+             before 1918")
+
+
+tapply(mandates_1$age, mandates_1$before_1918, summary)
+
+t.test(mandates_1$age[mandates_1$title_or_not==1 &
+                        mandates_1$before_1918==TRUE], 
+       mandates_1$age[mandates_1$title_or_not==0 &
+                        mandates_1$before_1918==TRUE])
+
+t.test(mandates_1$age[mandates_1$title_or_not==1 & 
+                        mandates_1$before_1918==FALSE], 
+       mandates_1$age[mandates_1$title_or_not==0 &
+                        mandates_1$before_1918==FALSE])
+
+```
+Looking at this part 6, we can say that yes, the title is actually something important because there is a significant difference between people before and after 1918 compared by title or not.
+
+# Part 7
+
+```{r part 7}
+
+mandates_count <- mandates %>% count(PERSON_ID) %>% 
+  arrange(desc(n)) %>% 
+  head(10)
+
+mandates_count <- mandates_count %>% inner_join(persons, by = c("PERSON_ID" = "ID"))
+
+mandates_count$Name=paste(mandates_count$FIRSTNAME, mandates_count$LASTNAME, sep=" ")
+
+ggplot(   mandates_count, aes(x=factor(Name), y=n)   )+
+  geom_col()+
+  coord_flip()+
+  labs(x="Name", y="n", title = "Politician with the most mandates")
+
+```
+
+In the part 7, I had to return tje first part so I could have the whole data set "mandates".
+
+Then, I had to count how many person ID is repeated, that I saved in "mandates_count". I used then ggplot.
+
+So as we can read on the chart, we see that the ID 9468 is the person that has the most number of mandates. Also, we see on the chart below the top 10.
+
+# Part 8
+
+```{r part 8}
+
+mandates$start_date <- as.Date(with(mandates, 
+                                    paste(MANDATE_START_DAY, 
+                                          MANDATE_START_MONTH, 
+                                          MANDATE_START_YEAR,sep="-")), 
+                               "%d-%m-%Y")     
+
+mandates$end_date <- as.Date(with(mandates, paste(MANDATE_END_DAY,
+                                                  MANDATE_END_MONTH,
+                                                  MANDATE_END_YEAR,sep="-")), 
+                             "%d-%m-%Y")
+
+mandates <- mandates %>% inner_join(persons, by = c("PERSON_ID" = "ID"))
+
+mandates$Name=paste(mandates$FIRSTNAME.y, mandates$LASTNAME.y, sep=" ")
+
+mandates_1 <- mandates %>% distinct(Name, ID.x, start_date, end_date) %>% 
+  group_by(Name) %>% 
+  arrange(start_date) %>% 
+  mutate(days_elapsed=start_date-lag(end_date)) %>% 
+  filter(days_elapsed<0) %>% 
+  count(Name, sort=TRUE)
+
+mandates_1 %>% 
+  arrange(desc(n)) %>% 
+  head(10) %>% 
+  ggplot(aes(x=factor(Name), y=n)   )+
+  geom_col()+
+  coord_flip()+
+  labs(x="Name", y="n", title = "Politician crossing mandates")
+
+```
+
+On the part 8, I created the combined date with day, month and year columns.
+
+I had to eliminated some tows first. I used the function "na.omit", saving data into the variable "pos" and then removing them with "-pos".
+
+I created the active date in order to compare if the person was in more than 1 mandate.
+
+Then, I was looking to find the answer for this exercice, So here we can see that a lot of people have more than 1 which means that those people had more than 1 mandate in the same time.
+
+# Part 9
+
+```{r part 9}
+
+pos6=which(affiliations$AFFILIATION_START_YEAR==0)
+affiliations=affiliations[-pos6,]
+
+pos9=which(affiliations$AFFILIATION_END_YEAR==0)
+affiliations=affiliations[-pos9,]
+
+affiliations_count <- affiliations %>%
+   distinct(PERSON_ID, PARTY) %>%
+   count(PERSON_ID) %>%
+   arrange(desc(n)) %>%
+  head(10)
+
+ggplot(data=affiliations_count, aes(x=factor(PERSON_ID), y=n)   )+
+  geom_col()+ 
+  coord_flip()+
+  labs(x="Name", y="n", title = "Top 10 affiliations")
+
+```
+
+On the part 9, I had to re-saved the data addiliations.
+
+Here we can see that there is some person id that appear multiple time, like 9233 that is appearing 5 time, and comparing to affiliations we can see that there is 5 differents party, as it is said in the affiliations_count.
+
+# Part 10
+
+```{r part 10}
+
+addresses$POSTAL_CODE[addresses$POSTAL_CODE==""]<- NA
+addresses$STREET[addresses$STREET==""]<- NA
+addresses$HOUSE_NUMBER[addresses$HOUSE_NUMBER==""]<- NA
+
+addresses$CITY[addresses$CITY==""]<- NA
+
+addresses <- na.omit(addresses) 
+
+postal_code <- as_tibble(addresses$POSTAL_CODE )%>%
+     separate(value, c("POSTAL_CODE", "CITY"), sep=" " ) %>%
+     select(POSTAL_CODE)
+
+addresses$POSTAL_CODE=postal_code$POSTAL_CODE
+
+addresses$full_addresses <-
+  (with(addresses, paste(STREET,HOUSE_NUMBER, ", ", 
+                         POSTAL_CODE, CITY,sep=" ")))
+
+ 
+addresses$full_addresses[addresses$full_addresses=="Sihlamtstrasse 3 , 
+                         8001 Zürich"]<-"Sihlamtsstrasse 3 , 8001 Zürich"
+addresses$full_addresses[addresses$full_addresses=="Carl Spitteler 29 , 
+                         8053 Zürich"]<-"Carl-Spitteler-Strasse , 298053 Zürich"
+
+set.seed(13)
+n<-   sample( nrow(addresses) ,size=20, replace = FALSE)
+
+addresses=addresses[n,]
+
+addresses_map <- addresses %>% 
+  tidygeocoder::geocode(full_addresses)
+ 
+map <- get_map(c(left = 8.125278, bottom = 47.082118,  
+                   right = 9.005302, top = 47.813350))
+ 
+ggmap(map) +
+      geom_point(
+        aes(x = long, y = lat),
+        data = addresses_map, colour = "red", size = 3
+      )+
+   labs(x="Longitude", y="Latitude", title ="Map representation with multiple addresses")
+
+```
+
+On the part 10, I first cleaned the data.
+
+Then, I worked on tidygeocoder and had to modify a wrong adresse.
+
+Using google map, I extracted the long and lat I needed in order to determine the perimeter of my map.
+
+Finally, I could p lot the map.
