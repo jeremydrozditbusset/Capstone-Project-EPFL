@@ -1,0 +1,234 @@
+---
+title: "FDS Final Project: Report #3"
+output: html_document
+---
+
+### using get content I have to show the results.
+
+# Part 1
+
+#### What are the highest grossing dramas from 2010?
+
+For the first part, I used the following link : 
+https://api.themoviedb.org/3/discover/movie?api_key=1832bdfef330f3b47949f5545e56c0a1&with_genres=18&primary_release_year=2010&sort_by=revenue.desc
+
+```{r Setup, include= FALSE}
+
+library(rvest)
+library(tidyverse)
+library(data.table)
+library(httr)
+library(purrr)
+```
+
+```{r Part 1, include= FALSE}
+
+knitr::opts_chunk$set(echo=FALSE, message  = FALSE, warning = FALSE)
+
+find2 <- "https://api.themoviedb.org/3/discover/movie?api_key=1832bdfef330f3b47949f5545e56c0a1&with_genres=18&primary_release_year=2010&sort_by=revenue.desc"
+
+find2 %>% 
+  GET() %>% 
+  content() %>% 
+  pluck("results") %>% 
+  map_chr(pluck, "title")
+
+```
+
+#### Have Will Ferrell and Liam Neeson even been in a movie together?
+
+```{r Part 1-2, include= TRUE}
+
+find3 <- "https://api.themoviedb.org/3/discover/movie?api_key=1832bdfef330f3b47949f5545e56c0a1&with_people=23659,3896&sort_by=vote_average.desc"
+
+find3 %>% 
+  GET() %>% 
+  content() %>% 
+  pluck("results") %>% 
+  map_chr(pluck, "title")
+
+```
+
+Then, with the following link :
+https://api.themoviedb.org/3/discover/movie?api_key=1832bdfef330f3b47949f5545e56c0a1&with_people=23659,3896&sort_by=vote_average.desc
+
+I found the total results of 4.
+
+#### Can you find kids movies with Tom Cruise in it?
+
+```{r Part 1-3, include= TRUE}
+
+find4 <- "https://api.themoviedb.org/3/discover/movie?api_key=1832bdfef330f3b47949f5545e56c0a1&certification.lte=G&with_people=500&sort_by=popularity.desc"
+
+find4 %>% 
+  GET() %>% 
+  content() %>% 
+  pluck("results") %>% 
+  map_chr(pluck, "title")
+
+```
+
+Finally, using the following link :
+https://api.themoviedb.org/3/discover/movie?api_key=1832bdfef330f3b47949f5545e56c0a1&certification.lte=G&with_people=500&sort_by=popularity.desc
+
+I got the following result : 85.
+
+# Part 2
+
+```{r part 2}
+
+Pixar <- GET("http://api.themoviedb.org/3/search/company?api_key=1832bdfef330f3b47949f5545e56c0a1&query=Pixar&page=1")
+
+Pixar_id <- httr::content(Pixar, as = "parsed")
+
+Pixar_iddd <- Pixar_id$results[[1]]$id
+
+# New code example below (53)
+
+Pixar_id %>% pluck("results", 1, "id")
+
+```
+For the part 2, U used the following link : 
+https://api.themoviedb.org/3/search/company?api_key=1832bdfef330f3b47949f5545e56c0a1&query=Pixar&page=1
+
+As I saw in the code for this exercice, I was able to see the id result.
+
+# Part 3
+
+```{r part 3}
+
+find2 <- paste("https://api.themoviedb.org/3/discover/movie?api_key=1832bdfef330f3b47949f5545e56c0a1&language=en-US&sort_by=popularity.desc&include_adult=false&include_video=false&page=%d&with_companies=",Pixar_iddd,"&with_watch_monetization_types=flatrate")
+
+find2 %>% 
+  GET() %>% 
+  content() %>% 
+  pluck("results") %>% 
+  map_chr(pluck, "title")
+
+# Unit and modify the line 75 to 81 to et the result
+
+data_pop <- find2 %>% 
+  GET() %>% 
+  content() %>% 
+  pluck("results") %>% 
+  map_df(magrittr::extract, c("title", "popularity"))
+
+map_dfr(1:7, function(i) {
+  resul2<- httr::GET(sprintf(find2, i))
+  result2_pixar<- content(resul2, "parsed")
+  data.frame(t(sapply(result2_pixar$results ,c)))
+  })
+
+# resul2<- httr::GET(find2)
+
+# result2_pixar<- content(resul2, "parsed")
+
+data_pixar <- data.frame(t(sapply(result2_pixar$results ,c)))
+
+```
+
+For the part 3, I used the following link :
+https://api.themoviedb.org/3/discover/movie?api_key=1832bdfef330f3b47949f5545e56c0a1&language=en-US&sort_by=popularity.desc&include_adult=false&include_video=false&page=1&with_companies=
+
+```{r part }
+
+print(head(data_pixar[,1:4]))
+
+```
+
+We are printing the first 6 observations to have an overview of the data set.
+
+```{r part 4}
+
+Disney <- GET("http://api.themoviedb.org/3/search/company?api_key=1832bdfef330f3b47949f5545e56c0a1&query=Disney&page=1")
+
+Disney_list <- httr::content(Disney, as = "parsed")
+
+Disney_listtt <- Disney_list$results[[7]]$id
+
+find22 <- "https://api.themoviedb.org/3/discover/movie?api_key=1832bdfef330f3b47949f5545e56c0a1&sort_by=popularity.desc&include_video=false&page=%d&with_companies=3"
+
+map_dfr(1:7, function(i) {
+  
+  resul2<- httr::GET(sprintf(find22, i))
+  
+  result2_pixar<- content(resul2, "parsed")
+  
+  data.frame(t(sapply(result2_pixar$results ,c)))
+
+}) -> data_pixar
+
+find3 <- "https://api.themoviedb.org/3/discover/movie?api_key=1832bdfef330f3b47949f5545e56c0a1&sort_by=popularity.desc&include_video=false&page=%d&with_companies=2"
+
+map_dfr(1:32, function(i) {
+  
+  resul3<- httr::GET(sprintf(find3, i))
+  
+  result3_disney<- content(resul3, "parsed")
+  
+  data.frame(t(sapply(result3_disney$results ,c)))
+
+}) -> data_disney
+
+data_disney <- data_disney[,-(15:34)]  
+
+data_pixar$release_date=unlist(data_pixar$release_date)
+
+data_pixar$release_date<- as.Date(data_pixar$release_date, "%Y-%m-%d")
+
+data_pixar <- data_pixar %>% 
+  filter(release_date >= "2006-01-01") %>% 
+  filter(vote_count>50)
+
+data_disney <-data_disney[!data_disney$release_date == "NULL", ] 
+data_disney <-data_disney[!data_disney$release_date == "", ] 
+
+data_disney$release_date=unlist(data_disney$release_date)
+
+data_disney$release_date<- as.Date(data_disney$release_date, "%Y-%m-%d")
+
+data_disney <- data_disney%>% 
+  filter(release_date >= "2006-01-01") %>% 
+  filter(vote_count>50)
+
+x<-cbind(rep("pixar",length(data_pixar$release_date))
+,data_pixar$vote_average)
+
+y<-cbind(rep("disney",length(data_disney$release_date))
+,data_disney$vote_average)
+
+films_comparision<- data.frame(rbind(x,y))
+
+colnames(films_comparision)=c("Companies","Vote_average")
+
+films_comparision$Vote_average=as.numeric(films_comparision$Vote_average)
+
+films_comparision$Companies=as.character(films_comparision$Companies)
+
+ggplot(data = films_comparision, aes(x= Companies, y = Vote_average)) +
+  geom_boxplot()+
+  labs(title="Vote comparison by companies")
+
+t.test(Vote_average ~ Companies, data=films_comparision )
+
+```
+
+Looking at the part 4, few steps was needed. Indeed, I had to save mutliples variables from Disney for example and using function such as "sapply".
+
+I also had to remove some null values columns.
+
+I applied statistical analysis. 
+
+For that I had to filter the year 2006, and transform release data as a date format (it was character initialy).
+
+I actually applied the same process for Disney and eliminated nulll value as well.
+
+I could then run the boxplot and t.test. It was important to verify that it were numerical values.
+
+On the bloxplot, we can see a difference, but to know if it is a significant difference so we have to apply a t test (independent sample t test)
+
+#### Answering to the following question : 
+
+Are the films from Pixar on average more popular than the films from Walt Disney Pictures?
+
+Based on the output, which p-value = 0.01849, so first there is a significant difference between vote average from disney and pixar, which means that on average, pixar has a highest score than disney.
