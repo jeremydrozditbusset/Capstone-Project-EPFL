@@ -1,0 +1,314 @@
+---
+title: "FDS Final Project: Report #4"
+output: html_document
+---
+
+```{r Setup, include= FALSE}
+
+knitr::opts_chunk$set(echo=FALSE, message  = FALSE, warning = FALSE)
+
+```
+
+# Part 1
+
+Have some athletes competed for different countries over time?
+
+```{r part1}
+
+library(tidyverse)
+library(readxl)
+
+olympics_athletes <- read_excel("olympics.xlsx", sheet="athletes")
+
+olympics_country <- read_excel("olympics.xlsx", sheet="country")
+
+olympics_games <- read_excel("olympics.xlsx", sheet="games")
+
+olympics_medals <- read_excel("olympics.xlsx", sheet="medals")
+
+pos1=which(olympics_games$City=="Stockholm" & olympics_games$Year==1956 )
+
+olympics_games=olympics_games[-pos1,]
+
+olympics_country_part1 <- olympics_country %>%
+   distinct(athlete_id, NOC) %>%
+   count(athlete_id) %>%
+   arrange(desc(n))
+
+print(head(olympics_country))
+
+```
+
+For this part 1, I first had to load all the data from "olympics.xlxs".
+
+Then I had to eliminated if year had more than 2 dates using distinct function as well as count. 
+
+As we can see, I print the 6 first results of the data set "olympics_athletes".
+
+We can actually see that there are more than 6 persons that competed the for different countries over the time.
+
+# Part 2
+
+Who are the ten athletes that took part in most games?
+
+```{r part2}
+
+olympics_country_part2 <- olympics_country %>% count(athlete_id) %>% 
+  arrange(desc(n)) %>% 
+  head(10)
+
+olympics_country_part2 <- 
+  olympics_country_part2 %>% 
+  left_join(olympics_athletes, by = c("athlete_id" = "ID")) %>% 
+  select(n, Name)
+
+print(olympics_country_part2[1:3,])
+
+```
+
+In the part 2, I was counting number of participation per athlete by putting the data in a descending order as well as selecting the top 10
+
+I just print the first 3 rows of those athletes.
+
+On this report, I found that Ian Millar, Afanasijs Kuzmins and Hubert Raudaschl were the 3 most competitors for olympics games.
+
+# Part 3
+
+What athlete(s) kept a Gold medal for the longest time?
+
+```{r part3}
+
+olympics_medals_part3 <- olympics_medals %>% filter(Medal=="Gold") %>% 
+  group_by(athlete_id, Event)
+
+olympics_games <- olympics_games %>% arrange(Year) %>% arrange(Season)
+
+olympics_games$id=seq(1,nrow(olympics_games))
+
+olympics_medals_part3 <- olympics_medals_part3 %>% 
+  left_join(olympics_games, by = c("Games" = "Games"))
+
+olympics_medals_part3 <- olympics_medals_part3 %>% 
+  group_by(Event, athlete_id) %>% 
+  mutate(diff = id - lag(id))
+
+olympics_medals_part3 %>% filter(diff==1) %>% 
+  count(athlete_id, Event) %>%
+  mutate(n=n+1) %>% 
+  arrange(desc(n))
+
+```
+
+For this part, first I had to filter only gold medal. Then, I ordered olympics games in ascending order and assigned sequences.
+
+I had to join the seq to medals data. So with the seq diff, I will see if there is a interrupted gold medals.
+
+I needed to group by person id and by event, saved into "olympics_medals_part3".
+
+Actually, I could see that the athlete number 39726 has won 6 gold consecutive medals !
+
+# Part 4
+
+What country(ies) kept a Gold medal for the longest time?
+
+```{r part4}
+
+olympics_medals_part4 <- olympics_medals %>% filter(Medal=="Gold") %>% 
+  group_by(Team)
+
+olympics_medals_part4 <- olympics_medals_part4 %>% 
+  distinct(Team, Event, Games) %>% 
+  left_join(olympics_games, by = c("Games" = "Games")) %>% 
+  group_by(Event, Team) %>% 
+  mutate(diff = id - lag(id))
+
+olympics_medals_part4 <- olympics_medals_part4 %>%
+        filter(diff==1) %>%
+        group_by(Team, Event) %>%
+        mutate( diff_2 =id - lag(id)) %>%
+        filter(diff_2==1) 
+
+olympics_medals_part4 %>% 
+  count(Event, Team) %>%
+  mutate(n=n+1) %>% 
+  arrange(desc(n))
+
+```
+
+Regarding this part, as I used lag two times, so I had to add 2 to the highest number. The first value is not counting with the lag function so I actually had to add the first one to the total. As I had a result of 2.
+
+We can see that United States noc has won 5 medals in a row the Athletics Men's Discus Throw event.
+
+# Part 5
+
+Who are the ten athletes that competed in the most events (some athletes take part in more than one event during games) ?
+
+```{r part5}
+
+olympics_medals_top10 <- olympics_medals %>% 
+  distinct(athlete_id, Event) %>% count(athlete_id) %>% arrange(desc(n)) %>% 
+  top_n(10) %>% 
+  left_join(olympics_athletes, by = c("athlete_id" = "ID")) %>% 
+  select(n, Name)
+
+print(head(olympics_medals_top10))
+
+```
+
+As we can see, we have 12 results because multiple persons have same n value so R show every values that appear in the top 10.
+
+I print the first 6 results of "olympics_medals_top10".
+
+We can see Ioannis Theofilakis, Alexandros Theofilakis, Gustaf Eric Carlberg, Gustaf Vilhelm Carlberg, Frangiskos D. Mavrommatis	and Paul Van Asbroeck are the top 6.
+
+# Part 6
+
+Creation of a new table showing the number of medals per country (rows) and per year (column).
+
+```{r part6}
+
+olympics_medals_part6_top15 <- olympics_medals %>% filter(!is.na(Medal)) %>%
+  count(Team) %>% top_n(15)
+
+olympics_medals_part6 <- olympics_medals %>% filter(!is.na(Medal)) %>% 
+  filter(Team %in% olympics_medals_part6_top15$Team)
+
+olympics_medals_part6 <- olympics_medals_part6 %>% 
+  left_join(olympics_country[, c(1,3)], 
+            by = c("athlete_id" = "athlete_id")) %>% 
+  left_join(olympics_games[, c(1,2)], by = c("Games" = "Games")) %>% 
+  count(Team, Year) %>% 
+  arrange(Year)
+
+olympics_medals_part6 <- pivot_wider(
+  olympics_medals_part6,
+  names_from = Year,
+  values_from = n
+)                     
+
+```
+
+For the part 6, I had to select the top 15 first.
+
+I also had to filter by that top 15 and joining + arranging so that I could see everything by country, all of that saved in "dolympics_medals_part6".
+
+Finally, I used oivot wider.
+
+# Part 7
+
+```{r part7}
+
+olympics_medals_part7 <- olympics_medals %>%
+  filter(Team %in% olympics_medals_part6_top15$Team) %>% count(Team)
+
+olympics_medals_part7_medal <- olympics_medals %>% 
+  filter(Team %in% olympics_medals_part6_top15$Team) %>%
+  filter(!is.na(Medal)) %>% count(Team)
+
+olympics_medals_part7_result <- olympics_medals_part7 %>% 
+  inner_join(olympics_medals_part7_medal, by =("Team" = "Team")) %>% 
+  mutate(ratio=(n.y/n.x)*100)
+
+ggplot(olympics_medals_part7_result, aes(x = Team, y = ratio))+
+         geom_col()+
+      labs(title="Ratio and Team comparison")
+
+
+Chi_test <- chisq.test(olympics_medals_part7_result$ratio)
+
+```
+
+I had to do the barplot in a first step "olympics_medals_part6" and "olympics_medals_part7".
+
+On the code, we see that Germany and Doviet Union have had higher changes of winning a medal regarding ou data.
+
+Null hypothesis will be there is no difference between team, around the same high. So alternative is that depending on team, there chances of winning a medal is different. As we can see on the square chi test, there is differences.
+
+So if x2 (that is the sum of all real values minus expected null hypothesis value) is higher or lower than freedom value, so its showing if the null hypothesis is rejected or not rejected. In our case, as the p-value is smaller than 0,05 so we rejected the null hypothesis, it means that every categories (country) have different probability of winning. There is significant evidence of an association between winning percentage and country.
+
+# Part 8
+
+```{r part8}
+
+olympics_athletes %>% 
+  ggplot(mapping = aes(x= Height, y= Weight) ) +
+  stat_summary(fun =  "mean",  geom = "point")+
+    labs(title="Relationship between Height and Weight")
+
+olympics_athletes <- olympics_athletes %>% 
+  left_join(olympics_medals, by = c("ID" = "athlete_id"))
+
+olympics_athletes=na.omit(olympics_athletes)
+
+olympics_athletes <- olympics_athletes %>% group_by(Sport) %>% 
+  mutate(mean_weight =mean(Weight)) %>% 
+  mutate(mean_height =mean(Height))%>% 
+  mutate(BMI=mean_height/(mean_weight/100)^2)
+
+olympics_athletes<- olympics_athletes %>% 
+  distinct(Sport, BMI, mean_height, mean_weight)
+
+max_height=
+  which(olympics_athletes$mean_height==max(olympics_athletes$mean_height))
+max_weight=
+  which(olympics_athletes$mean_weight==max(olympics_athletes$mean_weight))
+min_height=
+  which(olympics_athletes$mean_height==min(olympics_athletes$mean_height))
+min_weight=
+  which(olympics_athletes$mean_weight==min(olympics_athletes$mean_weight))
+max_bmi=
+  which(olympics_athletes$mean_height==min(olympics_athletes$mean_height))
+min_bmi=
+  which(olympics_athletes$mean_weight==min(olympics_athletes$mean_weight))
+
+library(ggrepel)
+
+ggplot(data=olympics_athletes, mapping = aes(x= mean_height, y= mean_weight) )+
+  geom_point()+
+  geom_text(aes(x=mean_height[max_height], y=mean_weight[max_height],
+                label=paste("Max height: ", Sport[max_height])))+
+  geom_text(aes(x=mean_height[min_height], y=mean_weight[min_height], 
+                label=paste("Min height: ", Sport[min_height])))+
+  geom_text(aes(x=mean_height[max_weight], y=mean_weight[max_weight], 
+                label=paste("Max weight: ", Sport[max_weight])))+
+geom_text(aes(x=mean_height[min_weight], y=mean_weight[min_weight],
+              label=paste("Min weight: ", Sport[min_weight])))+
+geom_text_repel(aes(x=mean_height[max_bmi], y=mean_weight[max_bmi],
+                    label=paste("Max bmi: ", Sport[max_bmi])))+
+geom_text_repel(aes(x=mean_height[min_bmi], y=mean_weight[min_bmi], 
+                    label=paste("Min bmi: ", Sport[min_bmi])))+
+  labs(x="Mean height", y="Mean weight", title="Max and min values regarding weight and height")
+
+```
+
+On the part 8, I had to plot the scaterplot and to group by sport (as there is null values I ignore it with the code "na.rm".)
+
+Then I could calculate the BMI.
+
+I had to remove repetition with distinct to answer to the question.
+
+# Part 9
+
+```{r part 9}
+
+olympics_medals_part9 <- olympics_medals %>% filter(!is.na(Medal))
+
+olympics_medals_part9 <- olympics_medals_part9 %>%
+  left_join(olympics_games, by = c("Games" = "Games"))
+
+olympics_medals_part9<- olympics_medals_part9 %>%  count(Year, Medal, Season)
+
+ggplot(olympics_medals_part9, aes(x=Year, y=n, color=Medal)) +
+  geom_line()+
+  facet_grid(Season ~ .)+
+  labs(title="Evolution of olympics medals won over the years", y="Count")
+
+```
+
+First I filtered medals with all  medals value, which I saved in "olympics_medals_part9".
+
+Then, I joined with year.
+
+It actually changed a lot over the time. The more time spent, the more the number of medals increases.
+
+We can see that over the year, the number of olympics medals have increased from around 50 in 1890 tl around 650 in 2010, for all medal type so Bronze Gold and Silver.
